@@ -30,8 +30,11 @@ class ViewController: UIViewController {
     var filterdData = SpaceData(x: 0.5, y: 0.5, z: 0.5) //???????
     var oldFilterdData = SpaceData(x: 0.5, y: 0.5, z: 0.5)
     
+    var startedShake = Date()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        becomeFirstResponder()
         // Do any additional setup after loading the view, typically from a nib.
         motionManager = CMMotionManager()
         
@@ -75,6 +78,23 @@ class ViewController: UIViewController {
         }
     }
     
+    func randomColor() -> UIColor{
+        switch arc4random()%5 {
+        case 0:
+            return UIColor.red
+        case 1:
+            return UIColor.blue
+        case 2:
+            return UIColor.red
+        case 3:
+            return UIColor.brown
+        case 4:
+            return UIColor.cyan
+        default:
+            return UIColor.black
+        }
+    }
+    
     func filterRawData(rawData : SpaceData, filterFactor: Filter){
         
         let f = filterFactor.rawValue
@@ -89,12 +109,35 @@ class ViewController: UIViewController {
         zLabel.text = String(format: "%.f℃",data.z)
     }
     
-    func updateGyroLabels(){
-        
+    override var canBecomeFirstResponder: Bool{
+        return true
     }
     
-    func updateMagnetometerLabels() {
-        
+    override func motionEnded(_ motion: UIEventSubtype, with event: UIEvent?) {
+        if event?.subtype == UIEventSubtype.motionShake{
+            print("Deviced shaked!")
+            let elapsed = Date().timeIntervalSince(startedShake)
+            if  elapsed >= 1{
+                print("skakad mer än en sekund")
+                xLabel.textColor = randomColor()
+                yLabel.textColor = randomColor()
+                zLabel.textColor = randomColor()
+            }else{
+                print("stopped shake before timer...")
+            }
+        }
+    }
+    
+    override func motionBegan(_ motion: UIEventSubtype, with event: UIEvent?) {
+        if event?.subtype == UIEventSubtype.motionShake{
+            print("börja skaka...")
+            startedShake = Date()
+        }
+    }
+    override func motionCancelled(_ motion: UIEventSubtype, with event: UIEvent?) {
+        if event?.subtype == UIEventSubtype.motionShake {
+            print("canelled shake")
+        }
     }
 
 
