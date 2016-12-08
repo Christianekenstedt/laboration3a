@@ -104,9 +104,9 @@ class ViewController: UIViewController {
     }
     
     func updateAccelerometerLabels(data: SpaceData){
-        xLabel.text = String(format: "%.f℃",data.x)
-        yLabel.text = String(format: "%.f℃",data.y)
-        zLabel.text = String(format: "%.f℃",data.z)
+        xLabel.text = String(format: "%.f°",data.x)
+        yLabel.text = String(format: "%.f°",data.y)
+        zLabel.text = String(format: "%.f°",data.z)
     }
     
     override var canBecomeFirstResponder: Bool{
