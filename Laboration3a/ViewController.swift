@@ -17,7 +17,7 @@ struct SpaceData {
 
 enum Filter: Double {
     case LOWPASS = 0.99
-    case CUSTOMPASS = 0.5
+    case CUSTOMPASS = 0.9
     case HIGHPASS = 0.1
 }
 
@@ -27,10 +27,18 @@ class ViewController: UIViewController {
     @IBOutlet weak var yLabel: UILabel!
     @IBOutlet weak var zLabel: UILabel!
     
-    var filterdData = SpaceData(x: 0.5, y: 0.5, z: 0.5) //???????
-    var oldFilterdData = SpaceData(x: 0.5, y: 0.5, z: 0.5)
+    var filterdData = SpaceData(x: 0.0, y: 0.0, z: 0.0) //???????
+    var oldFilterdData = SpaceData(x: 0.0, y: 0.0, z: 0.0)
     
-    var startedShake = Date()
+    var mLinearAcceleration = SpaceData(x: 0.0, y: 0.0, z: 0.0)
+    
+    
+    var SHAKE_THRESHOLD: Double = 1.0
+    var ACC_THRESHOLD: Double = 2
+    
+    var startTime = 0.0
+    var lastShake = 0.0
+    var count = 0
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -42,42 +50,74 @@ class ViewController: UIViewController {
             motionManager.accelerometerUpdateInterval = 0.2
             motionManager.startAccelerometerUpdates(to: OperationQueue.current!, withHandler: { (data:CMAccelerometerData?, err:Error?) in
                 if let accData = data?.acceleration{
-                    let π = M_PI
                     
                     
-                    var xAngle = atan( accData.x / (sqrt((accData.y*accData.y) + (accData.z*accData.z))))
-                    var yAngle = atan( accData.y / (sqrt((accData.x*accData.x) + (accData.z*accData.z))))
-                    var zAngle = atan( sqrt((accData.x*accData.x) + (accData.y*accData.y)) / accData.z)
+                    let xAngle = atan( accData.x / (sqrt((accData.y*accData.y) + (accData.z*accData.z))))
+                    let yAngle = atan( accData.y / (sqrt((accData.x*accData.x) + (accData.z*accData.z))))
+                    let zAngle = atan( sqrt((accData.x*accData.x) + (accData.y*accData.y)) / accData.z)
                     
-                    self.filterRawData(rawData: SpaceData(x: xAngle, y: yAngle, z: zAngle), filterFactor: .HIGHPASS)
+                    self.filterRawData(rawData: SpaceData(x: xAngle, y: yAngle, z: zAngle), filterFactor: .CUSTOMPASS)
+                    self.checkIfShaked()
                     
-                    var dataToDisplay = SpaceData(x: self.filterdData.x, y: self.filterdData.y, z: self.filterdData.z)
-                    dataToDisplay.x *= 180.00
-                    dataToDisplay.y *= 180.00
-                    dataToDisplay.z *= 180.00
-                    dataToDisplay.x /= π
-                    dataToDisplay.y /= π
-                    dataToDisplay.z /= π
+                    let dataToDisplay = self.radToDeg(dataTo: SpaceData(x: self.filterdData.x, y: self.filterdData.y, z: self.filterdData.z))
                     
                     self.updateAccelerometerLabels(data: dataToDisplay)
                     
                 }
             })
-            motionManager.gyroUpdateInterval = 0.01
-            motionManager.startGyroUpdates(to: OperationQueue.current!, withHandler: { (data:CMGyroData?, err:Error?) in
-                if let gyroData = data?.rotationRate{
-                    //print("x: \(gyroData.x), y: \(gyroData.y), z: \(gyroData.z)")
-                }
-            })
-            motionManager.magnetometerUpdateInterval = 0.01
-            motionManager.startMagnetometerUpdates(to: OperationQueue.current!, withHandler: { (data: CMMagnetometerData?, err:Error?) in
-                if let magnometerData = data?.magneticField{
-                    //print("x: \(magnometerData.x), y: \(magnometerData.y), z: \(magnometerData.z)")
-                }
-            })
         }
     }
     
+    func checkIfShaked(){
+        
+        let resulutant = getMaxCurrentLinearAcceleration()
+        if resulutant > SHAKE_THRESHOLD { // Kolla om skakning
+            let now = Date().timeIntervalSince1970
+            
+            if startTime == 0 {
+                startTime = now // Skakning börjad
+                lastShake = now
+            }
+            
+            let elapsed = now - lastShake
+            if elapsed < 0.5 {
+                lastShake = now
+                count = count + 1
+                
+                if count > 3{
+                    var totalElapsed = now - startTime
+                    if totalElapsed > 1 {
+                        // ändra färg
+                        xLabel.textColor = randomColor()
+                        yLabel.textColor = randomColor()
+                        zLabel.textColor = randomColor()
+                        reset()
+                    }
+                }
+            }else{
+                reset()
+            }
+        }
+    }
+    func reset(){
+        startTime = 0.0
+        lastShake = 0.0
+    }
+    
+    func radToDeg(dataTo: SpaceData)-> SpaceData {
+        let π = M_PI
+        var d = dataTo
+        d.x = d.x * 180.00
+        d.y = d.y * 180.00
+        d.z = d.z * 180.00
+        d.x = d.x / π
+        d.y = d.y / π
+        d.z = d.z / π
+        
+        return d
+    }
+    
+
     func randomColor() -> UIColor{
         switch arc4random()%5 {
         case 0:
@@ -101,6 +141,14 @@ class ViewController: UIViewController {
         filterdData.x = f * filterdData.x + (1.0 - f) * rawData.x
         filterdData.y = f * filterdData.y + (1.0 - f) * rawData.y
         filterdData.z = f * filterdData.z + (1.0 - f) * rawData.z
+        
+        mLinearAcceleration.x = rawData.x - filterdData.x
+        mLinearAcceleration.y = rawData.y - filterdData.y
+        mLinearAcceleration.z = rawData.z - filterdData.z
+    }
+    
+    func getMaxCurrentLinearAcceleration() -> Double{
+        return sqrt(mLinearAcceleration.x * mLinearAcceleration.x + mLinearAcceleration.y * mLinearAcceleration.y + mLinearAcceleration.z * mLinearAcceleration.z)
     }
     
     func updateAccelerometerLabels(data: SpaceData){
@@ -109,37 +157,5 @@ class ViewController: UIViewController {
         zLabel.text = String(format: "%.f°",data.z)
     }
     
-    override var canBecomeFirstResponder: Bool{
-        return true
-    }
-    
-    override func motionEnded(_ motion: UIEventSubtype, with event: UIEvent?) {
-        if event?.subtype == UIEventSubtype.motionShake{
-            print("Deviced shaked!")
-            let elapsed = Date().timeIntervalSince(startedShake)
-            if  elapsed >= 1{
-                print("skakad mer än en sekund")
-                xLabel.textColor = randomColor()
-                yLabel.textColor = randomColor()
-                zLabel.textColor = randomColor()
-            }else{
-                print("stopped shake before timer...")
-            }
-        }
-    }
-    
-    override func motionBegan(_ motion: UIEventSubtype, with event: UIEvent?) {
-        if event?.subtype == UIEventSubtype.motionShake{
-            print("börja skaka...")
-            startedShake = Date()
-        }
-    }
-    override func motionCancelled(_ motion: UIEventSubtype, with event: UIEvent?) {
-        if event?.subtype == UIEventSubtype.motionShake {
-            print("canelled shake")
-        }
-    }
-
-
 }
 
