@@ -80,7 +80,7 @@ class ViewController: UIViewController {
             }
             
             let elapsed = now - lastShake
-            if elapsed < 0.5 {
+            if elapsed < 1 {
                 lastShake = now
                 count = count + 1
                 
